@@ -110,6 +110,7 @@ class TrainDataset(torch.utils.data.Dataset):
 
         # Get target
         mask_1 = instance[:, :, self.target].astype(np.int8)  # Water = 1, Land = 0
+        mask_1[np.where(mask_1 == -1)] = 0  # Set nodata values to 0
         mask_0 = 1 - mask_1
 
         target = np.array([mask_0, mask_1])
@@ -128,7 +129,7 @@ def load_data(args):
     print("Total images: {}".format(len(paths)))
 
     if args.sample:
-        paths = paths[:1000]
+        paths = paths[:100]
 
     # Shuffle the paths
     random.seed(args.seed)
@@ -172,7 +173,7 @@ def train_model(train_loader, valid_loader, args):
 
     # specify loss function (binary cross-entropy)
     criterion = nn.CrossEntropyLoss()
-    sm = nn.Softmax(dim=1)
+    #sm = nn.Softmax(dim=1)
 
     # specify optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -197,7 +198,7 @@ def train_model(train_loader, valid_loader, args):
 
             # Execute model to get outputs
             output = model(images)
-            output = sm(output)
+            #output = sm(output)
 
             # Calculate loss
             loss = criterion(output, target)
