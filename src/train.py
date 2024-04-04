@@ -5,20 +5,15 @@
 # Imports
 import numpy as np
 import pandas as pd
-import sys
 import random
 import glob
 import argparse
 import os
 
-import cv2 as cv
-from PIL import Image
-from osgeo import gdal
 
 import torch
 import torch.nn as nn
 import torchvision
-from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from network import U_Net, R2U_Net, AttU_Net, R2AttU_Net
