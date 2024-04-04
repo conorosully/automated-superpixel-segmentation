@@ -120,7 +120,7 @@ class TrainDataset(torch.utils.data.Dataset):
 def load_data(args):
     """Load data from disk"""
 
-    paths = glob.glob(args.train_path + "*")
+    paths = glob.glob(args.train_path + "*.npy")
     print("Total images: {}".format(len(paths)))
 
     if args.sample:
