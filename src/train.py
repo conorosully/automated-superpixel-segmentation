@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--incl_bands",type=str,default="[1,2,3,4,5,6,7,8,9,10,11,12]",help="Bands to include, specified as a string of digits")
     parser.add_argument("--target_pos",type=int,default=-1,help="Position of the target band in the dataset (0-indexed)")
     parser.add_argument("--model_type", type=str, default="U_Net", help="Type of model to train")
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size for training")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs to train for")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
     parser.add_argument("--split", type=float, default=0.9, help="Train/Validation split")
@@ -94,7 +94,7 @@ class TrainDataset(torch.utils.data.Dataset):
         # Get spectral bands
         # bands = instance[:, :, :-1]
         bands = instance[:, :, self.incl_bands]  # Only include specified bands
-        bands = bands.astype(np.float32)
+        bands = bands.astype(np.float32) 
 
         # Normalise bands
         bands = utils.scale_bands(bands, self.satellite)
