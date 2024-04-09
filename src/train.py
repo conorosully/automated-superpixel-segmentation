@@ -43,6 +43,7 @@ def main():
     parser.add_argument("--device",type=str,default="cuda",choices=["cuda", "cpu", "mps"],help="Device to use for training",)
     parser.add_argument("--seed",type=int,default=42,help="Random seed for shuffling the dataset",)
 
+    parser.add_argument("--note",type=str,default="",help="Note for model run context",)
     # Parse the arguments
     args = parser.parse_args()
 
@@ -51,7 +52,8 @@ def main():
 
     # Set device based on argument
     args.device = torch.device(args.device)
-
+    print("\n" + args.note)
+    print("\nTraining model with the following arguments:")
     # Use the arguments
     print("Training model: {}".format(args.model_name))
     train_len = len(glob.glob(args.train_path + "*"))
