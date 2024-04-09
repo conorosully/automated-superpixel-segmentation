@@ -11,3 +11,7 @@ python apply_superpixels.py --input_dir /home/people/22205288/scratch/training -
 python apply_superpixels.py --input_dir /home/people/22205288/scratch/SWED/train --satellite sentinel 
 
 ## Test datasets
+
+python dataset_test.py /home/people/22205288/scratch/SWED/train sentinel 
+
+python superpixel-annotation/src/dataset_test.py /home/people/22205288/scratch/training landsat 
