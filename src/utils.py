@@ -60,7 +60,7 @@ def scale_bands(img,satellite="landsat"):
     if satellite == "landsat":
         img = np.clip(img * 0.0000275 - 0.2, 0, 1)
     elif satellite == "sentinel":
-        img = np.clip(img * 0.0001, 0, 1)
+        img = np.clip(img/10000, 0, 1)
     return img
 
 def edge_from_mask(mask):
