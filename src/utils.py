@@ -1,10 +1,10 @@
 # Class containing utility functions for the project
 
-import tifffile as tiff
+#import tifffile as tiff
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import rasterio as rio
+#import rasterio as rio
 import spyndex
 import xarray as xr
 
@@ -49,7 +49,10 @@ def display_bands(img, satellite="landsat"):
     fig, axs = plt.subplots(1, n, figsize=(20, 5))
 
     for i in range(n):
-        axs[i].imshow(img[:, :, i], cmap="gray")
+        if np.unique(img[:, :, i]).size == 1:
+            axs[i].imshow(img[:, :, i], cmap="gray", vmin=0, vmax=1)
+        else:
+            axs[i].imshow(img[:, :, i], cmap="gray")
         axs[i].set_title(band_names[i])
         axs[i].axis("off")
 
@@ -198,19 +201,26 @@ def get_threshold(index,threshold=-1):
     # Ensure the image is in the correct format (float or int) if necessary
     # index = index.astype('uint8') # Uncomment and adjust if needed
     
+    # Apply simple threshold to check for binary images
+    thresholded_img = index.copy()
+    thresholded_img[index >= 0] = 1
+    thresholded_img[index < 0] = 0
+
+    if np.unique(thresholded_img).size == 1:
+        return thresholded_img
+
     # Calculate Otsu's threshold
     index = np.nan_to_num(index, nan=0)
     if threshold == -1:
         otsu_threshold = threshold_otsu(index)
-        
-        # Apply threshold
-        thresholded_img = index.copy()
-        thresholded_img[index >= otsu_threshold] = 1
-        thresholded_img[index < otsu_threshold] = 0
     else:
-        thresholded_img = index.copy()
-        thresholded_img[index >= threshold] = 1
-        thresholded_img[index < threshold] = 0
+        otsu_threshold = threshold
+
+    # Apply threshold
+    thresholded_img = index.copy()
+    thresholded_img[index >= otsu_threshold] = 1
+    thresholded_img[index < otsu_threshold] = 0
+    
     
     return thresholded_img
 
@@ -255,9 +265,17 @@ def get_mask_from_bands(all_bands,satellite,display = False,rgb_bands = ["nir","
         ax[3].imshow(index,cmap='gray')
         ax[3].set_title('{}'.format(index_name))
 
-        ax[4].imshow(threshold,cmap='gray')
+        if np.unique(threshold).size == 1:
+            ax[4].imshow(threshold,cmap='gray',vmin=0, vmax=1)
+        else:
+            ax[4].imshow(threshold,cmap='gray')
         ax[4].set_title('Threshold')
-        ax[5].imshow(mask,cmap='gray')
+
+        if np.unique(mask).size == 1:
+            ax[5].imshow(mask, cmap="gray", vmin=0, vmax=1)
+        else:
+            ax[5].imshow(mask, cmap="gray")
+
         ax[5].set_title('Mask')
 
         for a in ax:
