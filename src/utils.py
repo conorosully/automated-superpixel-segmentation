@@ -18,7 +18,7 @@ from skimage.segmentation import felzenszwalb, slic, quickshift, watershed
 from skimage.filters import threshold_otsu
 
 base_path = "../data/"
-save_path = "/Users/conorosullivan/Google Drive/My Drive/"
+save_path = "/Users/conorosullivan/Google Drive/My Drive/UCD/research/Journal Paper 2 - superpixels/figures/"
 
 # dictionary of band names for each satellite
 band_dic = {"sentinel":{"coastal":0,"blue":1,"green":2,"red":3,"rededge1":4,"rededge2":5,"rededge3":6,"nir":7,"narrownir":8,"watervapour":9,"swir1":10,"swir2":11},
@@ -137,6 +137,7 @@ def histogram_equalization_luminance(img):
     
     return img_equalized
 
+
 def get_index(bands, index="MNDWI",satellite='sentinel'):
 
     """Add indices to image"""
@@ -221,8 +222,25 @@ def get_threshold(index,threshold=-1):
     thresholded_img[index >= otsu_threshold] = 1
     thresholded_img[index < otsu_threshold] = 0
     
-    
     return thresholded_img
+
+def enhance_contrast(img, contrast):
+    
+    """Enhance the contrast of an image using 3 approaches:
+    - contrast = 'hist': apply histogram equalization
+    - contrast = 'luminance': apply histogram equalization to the luminance channel
+    - contrast = float: rescale the image to the specified value"""
+
+    processed_img = img.copy()
+    if contrast == 'hist':
+        processed_img = histogram_equalization(processed_img)
+    elif contrast == 'luminance':
+        processed_img = histogram_equalization_luminance(processed_img)
+    else:
+        processed_img = processed_img.astype(np.float32)
+        processed_img = np.clip(processed_img, 0, contrast) / contrast
+    return processed_img
+
 
 # replace segments with mode prediction
 def get_superpixel_mask(segments, thresholded_img):
@@ -235,19 +253,14 @@ def get_superpixel_mask(segments, thresholded_img):
 
     return new_segments
 
-def get_mask_from_bands(all_bands,satellite,display = False,rgb_bands = ["nir","green","blue"], contrast = -1, index_name="MNDWI", threshold=-1,method='slic', **kwargs):
+def get_mask_from_bands(all_bands,satellite,display = False,rgb_bands = ["nir","green","blue"], index_name="MNDWI", threshold=-1,method='slic', **kwargs):
     """Get mask from bands using index and segmentation method"""
     # Get index
     all_bands_ = all_bands.copy()
     img = get_rgb(all_bands_,bands=rgb_bands,satellite=satellite)
-
-    if contrast != -1:
-        img_processed = get_rgb(all_bands_,bands=rgb_bands,satellite=satellite,contrast=contrast)
-    else:
-        img_processed = histogram_equalization_luminance(img)
-
+    
     index = get_index(all_bands,satellite=satellite,index=index_name)
-    segments = get_segments(img_processed, method=method, **kwargs)
+    segments = get_segments(img, method=method, **kwargs)
     threshold = get_threshold(index,threshold=threshold)
     mask = get_superpixel_mask(segments,threshold)
 
@@ -256,10 +269,11 @@ def get_mask_from_bands(all_bands,satellite,display = False,rgb_bands = ["nir","
 
         ax[0].imshow(img)
         ax[0].set_title('Original RGB')
+        img_processed = histogram_equalization_luminance(img)
         ax[1].imshow(img_processed)
         ax[1].set_title('Processed RGB')
 
-        ax[2].imshow(mark_boundaries(img_processed, segments))
+        ax[2].imshow(mark_boundaries(img, segments))
         ax[2].set_title('Segmentation')
 
         ax[3].imshow(index,cmap='gray')
