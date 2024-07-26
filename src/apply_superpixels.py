@@ -20,17 +20,28 @@ def apply_superpixels(input_dir, output_dir,satellite):
         all_bands = np.load(image_path)
         if satellite == "sentinel":
             all_bands = all_bands[:, :, :13]
+
+            # Get superpixel mask
+            superpixel_mask = utils.get_mask_from_bands(all_bands, 
+                                                        satellite=satellite,
+                                                        rgb_bands=["nir", "green", "blue"], 
+                                                        index_name="NDWI",
+                                                        threshold=0, 
+                                                        method='felzenszwalb',
+                                                        min_size=60)
+            
         elif satellite == "landsat":
+
             all_bands = all_bands[:, :, :8]
         
-        # Get superpixel mask
-        superpixel_mask = utils.get_mask_from_bands(all_bands, 
-                                                    satellite=satellite,
-                                                    rgb_bands=["nir", "green", "blue"], 
-                                                    index_name="NDWI",
-                                                    threshold=-1,
-                                                    method='slic',
-                                                    n_segments=1000)
+            # Get superpixel mask
+            superpixel_mask = utils.get_mask_from_bands(all_bands, 
+                                                        satellite=satellite,
+                                                        rgb_bands=["nir", "green", "blue"], 
+                                                        index_name="NDWI",
+                                                        threshold=-1,
+                                                        method='felzenszwalb',
+                                                        min_size=60)
         superpixel_mask =superpixel_mask.squeeze() # Adjusting the label shape if necessary
         
         # Save the superpixel mask
