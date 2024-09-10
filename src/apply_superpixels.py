@@ -7,6 +7,8 @@ from tqdm import tqdm
 
 def apply_superpixels(input_dir, output_dir,satellite):
 
+    """Apply superpixels to image files in the input directory and save the results in the output directory."""
+
     # List all image files
     image_files = [f for f in os.listdir(input_dir) if f.endswith('.npy')]
     print(f"Found {len(image_files)} image files.")

@@ -22,6 +22,7 @@ def process_npy_files(input_dir, output_dir):
     label_dir = os.path.join(input_dir, 'labels')
     image_files = [f for f in os.listdir(image_dir) if f.endswith('.npy')]
     print(f"Found {len(image_files)} image files.")
+    
     # add loading bar
     for image_file in tqdm(image_files):
         # Construct the corresponding label file name based on the image file name
