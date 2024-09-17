@@ -1,4 +1,4 @@
-# superpixel-annotation
+# automated-superpixel-segmentation
 Pretraining coastline image segmentation models. The automated annotation method, used to pretrian models, is based on superpixels and spectral indices. 
 
 This repository contains the code required to reproduce the results in the conference paper:
