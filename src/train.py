@@ -1,4 +1,4 @@
-# Trianing unet for coastline detection
+# Training unet for coastline detection
 # Conor O'Sullivan
 # 07 Feb 2023
 
@@ -9,7 +9,6 @@ import random
 import glob
 import argparse
 import os
-
 
 import torch
 import torch.nn as nn
@@ -27,10 +26,10 @@ def main():
 
     # Adding arguments
     parser.add_argument("--model_name", type=str, help="Name of the model to train")
-    parser.add_argument("--sample", type=bool, default=False, help="Whether to use a sample dataset")
-    parser.add_argument("--satellite", type=str,choices=["landsat", "sentinel"], help="Satellite to use for training")
-    parser.add_argument("--incl_bands",type=str,default="[1,2,3,4,5,6,7,8,9,10,11,12]",help="Bands to include, specified as a string of digits")
-    parser.add_argument("--target_pos",type=int,default=-1,help="Position of the target band in the dataset (0-indexed)")
+    parser.add_argument("--sample", action="store_true", help="Whether to use a sample dataset")
+    parser.add_argument("--satellite", type=str, choices=["landsat", "sentinel"], help="Satellite to use for training")
+    parser.add_argument("--incl_bands", type=str, default="[1,2,3,4,5,6,7,8,9,10,11,12]", help="Bands to include, specified as a string of digits")
+    parser.add_argument("--target_pos", type=int, default=-1, help="Position of the target band in the dataset (0-indexed)")
     parser.add_argument("--model_type", type=str, default="U_Net", help="Type of model to train")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs to train for")
@@ -38,12 +37,16 @@ def main():
     parser.add_argument("--split", type=float, default=0.9, help="Train/Validation split")
     parser.add_argument("--early_stopping", type=int, default=-1, help="Number of epochs to wait before stopping training. -1 to disable.")
 
-    parser.add_argument("--train_path",type=str,default="../data/training/",help="Path to the training data",)
-    parser.add_argument("--save_path",type=str,default="../models/",help="Path template for saving the model",)
-    parser.add_argument("--device",type=str,default="cuda",choices=["cuda", "cpu", "mps"],help="Device to use for training",)
-    parser.add_argument("--seed",type=int,default=42,help="Random seed for shuffling the dataset",)
+    parser.add_argument("--train_path", type=str, default="../data/training/", help="Path to the training data")
+    parser.add_argument("--save_path", type=str, default="../models/", help="Path template for saving the model")
+    parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu", "mps"], help="Device to use for training")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for shuffling the dataset")
 
-    parser.add_argument("--note",type=str,default="",help="Note for model run context",)
+    parser.add_argument("--note", type=str, default="", help="Note for model run context")
+    
+    # Added argument for binary mask training
+    parser.add_argument("--binary_mask", action="store_true", help="Use a single output mask with sigmoid loss")
+
     # Parse the arguments
     args = parser.parse_args()
 
@@ -54,23 +57,7 @@ def main():
     args.device = torch.device(args.device)
     print("\n" + args.note)
     print("\nTraining model with the following arguments:")
-    # Use the arguments
-    print("Training model: {}".format(args.model_name))
-    train_len = len(glob.glob(args.train_path + "*"))
-    print("Training data: {} images".format(train_len))
-    print("Sample: {}".format(args.sample))
-    print("Satellite: {}".format(args.satellite))
-    print("Include bands: {}".format(args.incl_bands))
-    print("Target band position: {}".format(args.target_pos))
-    print("Model type: {}".format(args.model_type))
-    print("Batch size: {}".format(args.batch_size))
-    print("Epochs: {}".format(args.epochs))
-    print("Learning rate: {}".format(args.lr))
-    print("Train/Validation split: {}".format(args.split))
-    print("Early stopping: {}".format(args.early_stopping))
-    print("Using device: {}".format(args.device))
-    print("Random seed: {}".format(args.seed))
-    print()
+    print(vars(args))  # Print all arguments
 
     # Load data
     train_loader, valid_loader = load_data(args)
@@ -86,6 +73,7 @@ class TrainDataset(torch.utils.data.Dataset):
         self.target = args.target_pos
         self.incl_bands = args.incl_bands
         self.satellite = args.satellite
+        self.binary_mask = args.binary_mask  # Store binary_mask flag
 
     def __getitem__(self, idx):
         """Get image and binary mask for a given index"""
@@ -94,7 +82,6 @@ class TrainDataset(torch.utils.data.Dataset):
         instance = np.load(path)
 
         # Get spectral bands
-        # bands = instance[:, :, :-1]
         bands = instance[:, :, self.incl_bands]  # Only include specified bands
         bands = bands.astype(np.float32) 
 
@@ -108,15 +95,18 @@ class TrainDataset(torch.utils.data.Dataset):
         # Get target
         mask_1 = instance[:, :, self.target].astype(np.int8)  # Water = 1, Land = 0
         mask_1[np.where(mask_1 == -1)] = 0  # Set nodata values to 0
-        mask_0 = 1 - mask_1
 
-        target = np.array([mask_0, mask_1])
-        target = torch.Tensor(target).squeeze()
+        if self.binary_mask:
+            target = torch.tensor(mask_1, dtype=torch.float32).unsqueeze(0)  # Single channel
+        else:
+            mask_0 = 1 - mask_1
+            target = torch.tensor(np.array([mask_0, mask_1]), dtype=torch.float32).squeeze()
 
         return bands, target
 
     def __len__(self):
         return len(self.paths)
+
 
 # Functions
 def load_data(args):
@@ -132,119 +122,87 @@ def load_data(args):
     random.seed(args.seed)
     random.shuffle(paths)
 
-    # Create a datasets for training and validation
+    # Create datasets
     split = int(args.split * len(paths))
-    train_data = TrainDataset(paths[:split],args)
-    valid_data = TrainDataset(paths[split:],args)
+    train_data = TrainDataset(paths[:split], args)
+    valid_data = TrainDataset(paths[split:], args)
 
-    # Prepare data for Pytorch model
+    # Prepare data for PyTorch model
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     valid_loader = DataLoader(valid_data, batch_size=args.batch_size)
-
-    print("Training images: {}".format(train_data.__len__()))
-    print("Validation images: {}".format(valid_data.__len__()))
-
-    #
-    bands, target = train_data.__getitem__(0)
-
-    print("Bands shape: {}".format(bands.shape))
-    print("Min: {} Max: {} Avg: {}".format(bands.min(), bands.max(), bands.mean()))
-    print("Target shape: {}".format(target.shape))
-    print("Target unique: {}".format(torch.unique(target)))
 
     return train_loader, valid_loader
 
 
 def train_model(train_loader, valid_loader, args):
-    # define the model
+    # Define the model
+    out_channels = 1 if args.binary_mask else 2  # Changed for binary classification
     if args.model_type == "U_Net":
-        model = U_Net(len(args.incl_bands), 2)
+        model = U_Net(len(args.incl_bands), out_channels)
     elif args.model_type == "R2U_Net":
-        model = R2U_Net(len(args.incl_bands), 2)
+        model = R2U_Net(len(args.incl_bands), out_channels)
     elif args.model_type == "AttU_Net":
-        model = AttU_Net(len(args.incl_bands), 2)
+        model = AttU_Net(len(args.incl_bands), out_channels)
     elif args.model_type == "R2AttU_Net":
-        model = R2AttU_Net(len(args.incl_bands), 2)
+        model = R2AttU_Net(len(args.incl_bands), out_channels)
 
     model.to(args.device)
 
-    # specify loss function (binary cross-entropy)
-    criterion = nn.CrossEntropyLoss()
-    #sm = nn.Softmax(dim=1)
+    # Choose loss function based on binary mask flag
+    criterion = nn.BCEWithLogitsLoss() if args.binary_mask else nn.CrossEntropyLoss()
 
-    # specify optimizer
+    # Specify optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # Train the model
+    # Training loop
     min_loss = np.inf
-    epochs_no_improve = 0  # Counter for epochs with no improvement in validation loss
-
+    epochs_no_improve = 0
 
     for epoch in range(args.epochs):
 
         print("Epoch {} |".format(epoch + 1), end=" ")
 
-        model = model.train()
+        model.train()
+        for images, target in train_loader:
+            images, target = images.to(args.device), target.to(args.device)
 
-        for images, target in iter(train_loader):
-            images = images.to(args.device)
-            target = target.to(args.device)
-
-            # Zero gradients of parameters
             optimizer.zero_grad()
-
-            # Execute model to get outputs
             output = model(images)
-            #output = sm(output)
 
-            # Calculate loss
+            if args.binary_mask:
+                target = target.float()  # Ensure correct dtype for BCEWithLogitsLoss
+
             loss = criterion(output, target)
-
-            # Run backpropogation to accumulate gradients
             loss.backward()
-
-            # Update model parameters
             optimizer.step()
 
-        # Calculate validation loss
-        model = model.eval()
-
+        # Validation
+        model.eval()
         valid_loss = 0
-        for images, target in iter(valid_loader):
-            images = images.to(args.device)
-            target = target.to(args.device)
+        with torch.no_grad():
+            for images, target in valid_loader:
+                images, target = images.to(args.device), target.to(args.device)
+                output = model(images)
 
-            output = model(images)
+                if args.binary_mask:
+                    target = target.float()
 
-            loss = criterion(output, target)
-
-            valid_loss += loss.item()
+                valid_loss += criterion(output, target).item()
 
         valid_loss /= len(valid_loader)
         print("| Validation Loss: {}".format(round(valid_loss, 5)))
 
-
         if valid_loss < min_loss:
-            print("Saving model...")
+            torch.save(model.state_dict(), os.path.join(args.save_path, args.model_name + ".pth"))
             min_loss = valid_loss
-            epochs_no_improve = 0  # Reset counter
-
-            # Save the model
-            if not os.path.exists(args.save_path):
-                os.makedirs(args.save_path)
-
-            save_path = os.path.join(args.save_path, args.model_name + ".pth")
-
-            torch.save(model.state_dict(), save_path)
+            epochs_no_improve = 0
         else:
             epochs_no_improve += 1
-        
-        # Check if early stopping is to be performed
-        if args.early_stopping != -1 and epochs_no_improve >= args.early_stopping:
-            print("Early stopping triggered after {} epochs with no improvement.".format(epochs_no_improve))
-            break  # Break out of the loop
+
+        if args.early_stopping > 0 and epochs_no_improve >= args.early_stopping:
+            print("Early stopping triggered.")
+            break
 
 
 if __name__ == "__main__":
-
     main()

@@ -18,7 +18,7 @@ from skimage.segmentation import felzenszwalb, slic, quickshift, watershed
 from skimage.filters import threshold_otsu
 
 base_path = "../data/"
-save_path = "/Users/conorosullivan/Google Drive/My Drive/UCD/research/Journal Paper 2 - superpixels/figures/"
+save_path = "/Users/conorosullivan/Google Drive/My Drive/1 UCD/0 research/JP02 - finetuning image segmentation models/figures/"
 
 # dictionary of band names for each satellite
 band_dic = {"sentinel":{"coastal":0,"blue":1,"green":2,"red":3,"rededge1":4,"rededge2":5,"rededge3":6,"nir":7,"narrownir":8,"watervapour":9,"swir1":10,"swir2":11},
