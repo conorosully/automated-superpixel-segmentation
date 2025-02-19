@@ -260,9 +260,14 @@ def get_mask_from_bands(all_bands,satellite,display = False,rgb_bands = ["nir","
     img = get_rgb(all_bands_,bands=rgb_bands,satellite=satellite)
     
     index = get_index(all_bands,satellite=satellite,index=index_name)
-    segments = get_segments(img, method=method, **kwargs)
     threshold = get_threshold(index,threshold=threshold)
-    mask = get_superpixel_mask(segments,threshold)
+
+    # If no segmentation method is specified, return the thresholded index as mask
+    if method == 'none':
+        mask = threshold
+    else:
+        segments = get_segments(img, method=method, **kwargs)
+        mask = get_superpixel_mask(segments,threshold)
 
     if display:
         fig, ax = plt.subplots(1, 6, figsize=(15, 5))

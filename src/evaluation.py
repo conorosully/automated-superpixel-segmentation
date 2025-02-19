@@ -4,10 +4,7 @@ import numpy as np
 from train import *  # load dataset and model classes
 import argparse
 
-
-
 import utils
-
 
 def shuffle_band(band):
     """Shuffle a single spectral band of an image"""
@@ -17,7 +14,6 @@ def shuffle_band(band):
     perm_image.resize(256, 256)
 
     return perm_image
-
 
 def permutate_bands(img, bands):
     """Permuate bands in list of bands"""
@@ -46,20 +42,33 @@ def permutate_bands(img, bands):
     return img
 
 class Args:
-    def __init__(self, target_pos, incl_bands, satellite):
+    def __init__(self, target_pos, incl_bands, satellite, binary_mask):
         self.target_pos = target_pos
         self.incl_bands = incl_bands
         self.satellite = satellite
+        self.binary_mask = binary_mask
 
-
-def get_preds(model, test_paths, batch_size=10, target_pos=-1, incl_bands=[0, 1, 2, 3, 4, 5, 6], satellite="landsat",perm_bands=None,device='mps'):
+def get_preds(model, 
+              test_paths, 
+              threshold=0.5,
+              binary_mask=False,
+              batch_size=10, 
+              target_pos=-1, 
+              incl_bands=[0, 1, 2, 3, 4, 5, 6], 
+              satellite="landsat",
+              perm_bands=None,
+              device='mps'):
+    
     """Get model predictions for a given dataloader"""
     
-    
-    args = Args(target_pos, incl_bands, satellite)
+    args = Args(target_pos, incl_bands, satellite, binary_mask)
     test_data = TrainDataset(test_paths, args)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
-    sm = nn.Softmax(dim=1)
+
+    if binary_mask:
+        sm = nn.Sigmoid()
+    else:
+        sm = nn.Softmax(dim=1)
 
     arr_targets = []
     arr_preds = []
@@ -76,10 +85,24 @@ def get_preds(model, test_paths, batch_size=10, target_pos=-1, incl_bands=[0, 1,
         output = model(images)
         output = sm(output)
 
+        pos = 1
+        if binary_mask:
+            pos = 0
+
         # Get model predictions
-        targets = [np.array(t[1]) for t in target]
-        preds = [np.round(out) for out in output.cpu().detach()]
-        preds = [np.array(pred[1]) for pred in preds]
+        probs = output.cpu().detach().numpy()
+        probs =[np.array(p[pos]) for p in probs]
+
+        #apply thresgold to all pixels
+        preds = []
+        for p in probs:
+            pred = np.zeros_like(p)
+            pred[p>threshold]=1
+            preds.append(pred)
+        preds = np.array(preds)
+        
+        # Get model predictions
+        targets = [np.array(t[pos]) for t in target]
 
         arr_targets.extend(targets)
         arr_preds.extend(preds)
