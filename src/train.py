@@ -194,6 +194,7 @@ def train_model(train_loader, valid_loader, args):
 
         if valid_loss < min_loss:
             torch.save(model.state_dict(), os.path.join(args.save_path, args.model_name + ".pth"))
+            print("Model saved.")
             min_loss = valid_loss
             epochs_no_improve = 0
         else:
